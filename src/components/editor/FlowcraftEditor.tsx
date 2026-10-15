@@ -619,65 +619,38 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
     activeProject,
   ]);
 
-  // Diagram Search Logic
+  // Diagram Search Logic: Compute matches and focus active match without updating nodes in an infinite loop
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchMatches([]);
       setSearchMatchIndex(0);
-      setNodes((nds) =>
-        nds.map((n) => ({
-          ...n,
-          data: { ...n.data, isSearchMatch: false, isSearchActive: false },
-        }))
-      );
       return;
     }
 
     const q = searchQuery.toLowerCase();
-    const matches = nodes.filter((n) =>
+    const matched = nodes.filter((n) =>
       ((n.data as any)?.label || "").toLowerCase().includes(q)
     );
-    const matchIds = matches.map((m) => m.id);
+    const matchIds = matched.map((m) => m.id);
     setSearchMatches(matchIds);
     setSearchMatchIndex(0);
 
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        data: {
-          ...n.data,
-          isSearchMatch: matchIds.includes(n.id),
-          isSearchActive: matchIds[0] === n.id,
-        },
-      }))
-    );
-
-    if (matches.length > 0 && rfInstance) {
-      const activeMatch = matches[0];
+    if (matched.length > 0 && rfInstance) {
+      const activeMatch = matched[0];
       rfInstance.setCenter(
         activeMatch.position.x + 90,
         activeMatch.position.y + 40,
         { zoom: 1.2, duration: 400 }
       );
     }
-  }, [searchQuery, nodes, rfInstance, setNodes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, rfInstance]);
 
   const handleSearchNext = () => {
     if (searchMatches.length === 0) return;
     const nextIdx = (searchMatchIndex + 1) % searchMatches.length;
     setSearchMatchIndex(nextIdx);
     const targetId = searchMatches[nextIdx];
-
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        data: {
-          ...n.data,
-          isSearchActive: n.id === targetId,
-        },
-      }))
-    );
-
     const targetNode = nodes.find((n) => n.id === targetId);
     if (targetNode && rfInstance) {
       rfInstance.setCenter(
@@ -694,17 +667,6 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
       (searchMatchIndex - 1 + searchMatches.length) % searchMatches.length;
     setSearchMatchIndex(prevIdx);
     const targetId = searchMatches[prevIdx];
-
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        data: {
-          ...n.data,
-          isSearchActive: n.id === targetId,
-        },
-      }))
-    );
-
     const targetNode = nodes.find((n) => n.id === targetId);
     if (targetNode && rfInstance) {
       rfInstance.setCenter(
@@ -714,6 +676,7 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
       );
     }
   };
+
 
 
 
@@ -1460,6 +1423,58 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
         selectedCount={selectedNodeIds.length}
         onConfirmExport={handleConfirmExport}
       />
+
+      {/* Search Bar */}
+      <SearchBar
+        isOpen={isSearchOpen}
+        onClose={() => {
+          setIsSearchOpen(false);
+          setSearchQuery("");
+          setSearchMatches([]);
+        }}
+        query={searchQuery}
+        onQueryChange={setSearchQuery}
+        matchesCount={searchMatches.length}
+        currentIndex={searchMatchIndex}
+        onNext={handleSearchNext}
+        onPrev={handleSearchPrev}
+      />
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          type={contextMenu.type}
+          onClose={() => setContextMenu(null)}
+          onAddNode={(type, label) => {
+            handleAddNode(type || "process", label || "New Step");
+            setContextMenu(null);
+          }}
+          onDuplicate={() => {
+            handleDuplicateSelection();
+            setContextMenu(null);
+          }}
+          onDelete={() => {
+            if (contextMenu.type === "node" && contextMenu.targetId) {
+              const node = nodes.find((n) => n.id === contextMenu.targetId);
+              if (node) onNodesDelete([node]);
+            } else if (contextMenu.type === "edge" && contextMenu.targetId) {
+              const edge = edges.find((e) => e.id === contextMenu.targetId);
+              if (edge) onEdgesDelete([edge]);
+            }
+            setContextMenu(null);
+          }}
+          onAutoLayout={() => {
+            handleAutoLayout();
+            setContextMenu(null);
+          }}
+          onClearCanvas={() => {
+            setIsClearModalOpen(true);
+            setContextMenu(null);
+          }}
+        />
+      )}
 
       {/* Shortcuts Help Modal */}
       <ShortcutsModal

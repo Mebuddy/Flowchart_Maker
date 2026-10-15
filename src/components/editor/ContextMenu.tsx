@@ -17,9 +17,10 @@ interface ContextMenuProps {
   onClose: () => void;
   onDuplicate?: () => void;
   onDelete?: () => void;
-  onAddNode?: () => void;
+  onAddNode?: (type?: any, label?: string) => void;
   onAutoLayout?: () => void;
   onEditAi?: () => void;
+  onClearCanvas?: () => void;
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -33,6 +34,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   onAddNode,
   onAutoLayout,
   onEditAi,
+  onClearCanvas,
 }) => {
   return (
     <div
@@ -112,6 +114,17 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           >
             <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
             <span>Auto Layout</span>
+          </button>
+          <div className="h-px bg-slate-800 my-1" />
+          <button
+            onClick={() => {
+              onClearCanvas?.();
+              onClose();
+            }}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-rose-500/10 text-rose-400 hover:text-rose-300 text-left"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Clear Canvas</span>
           </button>
         </>
       )}
