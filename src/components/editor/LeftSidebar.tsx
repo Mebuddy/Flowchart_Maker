@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Sparkles,
   Cpu,
@@ -12,6 +12,10 @@ import {
   AlertCircle,
   RefreshCw,
   PlusCircle,
+  Search,
+  Clock,
+  Edit2,
+  Check,
 } from "lucide-react";
 import { FlowProject, LayoutDirection } from "@/lib/schema";
 
@@ -29,6 +33,7 @@ interface LeftSidebarProps {
   onSelectProject: (id: string) => void;
   onDuplicateProject: (id: string) => void;
   onDeleteProject: (id: string) => void;
+  onRenameProject: (id: string, newTitle: string) => void;
   onNewDiagram: () => void;
   isOpen: boolean;
   onToggleOpen: () => void;
@@ -66,14 +71,39 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onSelectProject,
   onDuplicateProject,
   onDeleteProject,
+  onRenameProject,
   onNewDiagram,
   isOpen,
   onToggleOpen,
 }) => {
   const [activeTab, setActiveTab] = useState<"input" | "saved">("input");
+  const [projectSearch, setProjectSearch] = useState("");
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+
   const charLimit = 12000;
   const charCount = prompt.length;
   const isOverLimit = charCount > charLimit;
+
+  // Filtered and sorted by recent update
+  const filteredProjects = useMemo(() => {
+    let list = [...savedProjects].sort((a, b) => {
+      const ta = new Date(a.updatedAt || a.createdAt).getTime();
+      const tb = new Date(b.updatedAt || b.createdAt).getTime();
+      return tb - ta;
+    });
+
+    if (projectSearch.trim()) {
+      const q = projectSearch.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.title.toLowerCase().includes(q) ||
+          p.summary?.toLowerCase().includes(q) ||
+          p.originalPrompt?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [savedProjects, projectSearch]);
 
   if (!isOpen) {
     return (
@@ -88,6 +118,18 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       </div>
     );
   }
+
+  const handleStartRename = (id: string, currentTitle: string) => {
+    setEditingProjectId(id);
+    setEditTitle(currentTitle);
+  };
+
+  const handleSaveRename = (id: string) => {
+    if (editTitle.trim()) {
+      onRenameProject(id, editTitle.trim());
+    }
+    setEditingProjectId(null);
+  };
 
   return (
     <aside className="w-80 md:w-96 h-[calc(100vh-3.5rem)] bg-slate-950/95 border-r border-slate-800 flex flex-col z-20 shrink-0 select-none backdrop-blur-md">
@@ -266,7 +308,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
       {activeTab === "saved" && (
         <div className="flex-1 flex flex-col p-4 overflow-y-auto space-y-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-semibold text-slate-300">Your Diagrams</span>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+              <Clock className="w-3.5 h-3.5 text-blue-400" />
+              <span>Recent Diagrams</span>
+            </div>
             <button
               onClick={onNewDiagram}
               className="flex items-center gap-1 text-[11px] font-medium text-blue-400 hover:text-blue-300"
@@ -276,54 +321,103 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             </button>
           </div>
 
-          {savedProjects.length === 0 ? (
-            <div className="text-center py-12 text-slate-500 text-xs">
-              No saved diagrams found.
-            </div>
-          ) : (
-            savedProjects.map((p) => {
-              const isActive = p.id === activeProjectId;
-              return (
-                <div
-                  key={p.id}
-                  className={`p-3 rounded-lg border transition-all ${
-                    isActive
-                      ? "bg-blue-950/40 border-blue-500/50 shadow-md"
-                      : "bg-slate-900/80 border-slate-800 hover:border-slate-700"
-                  }`}
-                >
-                  <div
-                    onClick={() => onSelectProject(p.id)}
-                    className="cursor-pointer"
-                  >
-                    <div className="text-xs font-semibold text-slate-200 hover:text-white truncate">
-                      {p.title}
-                    </div>
-                    <div className="text-[11px] text-slate-400 mt-1 line-clamp-1">
-                      {p.nodes.length} nodes · {p.edges.length} edges · {p.layoutDirection}
-                    </div>
-                  </div>
+          {/* Search diagrams filter */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+            <input
+              type="text"
+              value={projectSearch}
+              onChange={(e) => setProjectSearch(e.target.value)}
+              placeholder="Search saved diagrams..."
+              className="w-full text-xs text-slate-200 bg-slate-900/80 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 outline-none focus:border-blue-500/80 placeholder-slate-500"
+            />
+          </div>
 
-                  <div className="flex items-center justify-end gap-1.5 mt-2 pt-2 border-t border-slate-800/80">
-                    <button
-                      onClick={() => onDuplicateProject(p.id)}
-                      title="Duplicate diagram"
-                      className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDeleteProject(p.id)}
-                      title="Delete diagram"
-                      className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+          <div className="space-y-2 overflow-y-auto">
+            {filteredProjects.length === 0 ? (
+              <div className="text-center py-10 text-slate-500 text-xs">
+                {projectSearch ? "No diagrams matching search." : "No saved diagrams found."}
+              </div>
+            ) : (
+              filteredProjects.map((p) => {
+                const isActive = p.id === activeProjectId;
+                const isEditingThis = editingProjectId === p.id;
+                return (
+                  <div
+                    key={p.id}
+                    className={`p-3 rounded-lg border transition-all ${
+                      isActive
+                        ? "bg-blue-950/40 border-blue-500/50 shadow-md"
+                        : "bg-slate-900/80 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    {isEditingThis ? (
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveRename(p.id);
+                            if (e.key === "Escape") setEditingProjectId(null);
+                          }}
+                          autoFocus
+                          className="flex-1 text-xs text-white bg-slate-950 border border-blue-500 rounded px-2 py-1 outline-none"
+                        />
+                        <button
+                          onClick={() => handleSaveRename(p.id)}
+                          className="p-1 text-emerald-400 hover:bg-slate-800 rounded"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => onSelectProject(p.id)}
+                        className="cursor-pointer"
+                      >
+                        <div className="text-xs font-semibold text-slate-200 hover:text-white truncate">
+                          {p.title}
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-1 line-clamp-1">
+                          {p.nodes.length} nodes · {p.edges.length} edges · {p.preset || "default"}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-1.5 mt-2 pt-2 border-t border-slate-800/80">
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        {new Date(p.updatedAt || p.createdAt).toLocaleDateString()}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleStartRename(p.id, p.title)}
+                          title="Rename diagram"
+                          className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => onDuplicateProject(p.id)}
+                          title="Duplicate diagram"
+                          className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => onDeleteProject(p.id)}
+                          title="Delete diagram"
+                          className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </div>
         </div>
       )}
     </aside>

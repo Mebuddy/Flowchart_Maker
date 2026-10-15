@@ -91,25 +91,36 @@ export function shouldExcludeFromExport(node: HTMLElement): boolean {
   );
 }
 
+export interface CustomExportOptions {
+  scale?: number;
+  backgroundColor?: string;
+  padding?: number;
+}
+
 export async function exportCanvasToImage(
   element: HTMLElement,
   format: "png" | "svg",
   title: string,
-  backgroundColor: string = "#0B0F19"
+  backgroundColor: string = "#0B0F19",
+  options?: CustomExportOptions
 ): Promise<void> {
   const filename = `${title.toLowerCase().replace(/[^a-z0-9_-]/g, "_") || "flowcraft_diagram"}.${format}`;
+  const scale = options?.scale ?? 2;
+  const bg = options?.backgroundColor ?? backgroundColor;
 
   // Filter out editor overlays, selection controls, and minimap using dedicated selector
   const filter = (node: HTMLElement) => {
     return !shouldExcludeFromExport(node);
   };
 
+  const imageOptions = {
+    pixelRatio: scale,
+    backgroundColor: bg,
+    filter: filter as (domNode: Node) => boolean,
+  };
+
   if (format === "png") {
-    const dataUrl = await toPng(element, {
-      pixelRatio: 2, // High resolution
-      backgroundColor,
-      filter: filter as (domNode: Node) => boolean,
-    });
+    const dataUrl = await toPng(element, imageOptions);
     const a = document.createElement("a");
     a.href = dataUrl;
     a.download = filename;
@@ -118,7 +129,7 @@ export async function exportCanvasToImage(
     document.body.removeChild(a);
   } else {
     const dataUrl = await toSvg(element, {
-      backgroundColor,
+      backgroundColor: bg,
       filter: filter as (domNode: Node) => boolean,
     });
     const a = document.createElement("a");

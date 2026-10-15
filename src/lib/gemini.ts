@@ -307,3 +307,40 @@ export async function generateFlowGraph(prompt: string): Promise<{
     retryAfterSec
   );
 }
+
+/**
+ * Conversational AI Editing: modifies an existing diagram or selected subgraph based on a natural-language instruction.
+ * Preserves existing node IDs and structure where appropriate.
+ */
+export async function modifyFlowGraph(
+  instruction: string,
+  currentGraph: FlowGraph,
+  selectedNodeIds?: string[]
+): Promise<{
+  graph: FlowGraph;
+  validation: ValidationResult;
+  usedFallbackModel?: boolean;
+  metrics?: GenerationMetrics;
+}> {
+  const selectedContext =
+    selectedNodeIds && selectedNodeIds.length > 0
+      ? `Focus specifically on modifying the subgraph involving these node IDs: ${selectedNodeIds.join(", ")}.`
+      : "Apply changes to the overall flowchart.";
+
+  const prompt = `You are editing an existing flowchart.
+User edit instruction: "${instruction}"
+Scope: ${selectedContext}
+
+Current flowchart JSON structure:
+${JSON.stringify(currentGraph, null, 2)}
+
+Requirements:
+1. Apply the user's requested edit precisely (e.g. adding missing branches, retry loops, error handling, validation, or simplifying).
+2. PRESERVE existing node IDs and labels that do not need to change so manual layout and connections stay consistent.
+3. Add new nodes with clear descriptive IDs (e.g. 'node_error_handler', 'node_retry_check').
+4. Ensure all edges connect valid node IDs and decision nodes have clear "Yes"/"No" branch labels.
+5. Return the complete updated graph.`;
+
+  return generateFlowGraph(prompt);
+}
+

@@ -12,6 +12,7 @@ export const SAMPLE_PROJECTS: FlowProject[] = [
     assumptions: ["Assumes hardware clock provides 1Hz polling interval", "Continuous controller with no explicit termination"],
     originalPrompt: "Read the temperature sensor every second. If the temperature exceeds 40 degrees Celsius, turn on the cooling fan. Otherwise, keep the fan off. Repeat this process continuously.",
     layoutDirection: "TB",
+    preset: "default",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     nodes: [
