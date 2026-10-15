@@ -71,6 +71,9 @@ GOOGLE_GENERATIVE_AI_API_KEY=AIzaSy...
 # Optional: Gemini model override (defaults to gemini-3.8-flash)
 GEMINI_MODEL=gemini-3.8-flash
 
+# Optional: Fallback model during transient overload spikes (defaults to gemini-2.5-flash)
+GEMINI_FALLBACK_MODEL=gemini-2.5-flash
+
 # Required for Single-Owner Password Gate (Optional in development, required in production)
 APP_ACCESS_PASSWORD=choose_a_strong_password
 

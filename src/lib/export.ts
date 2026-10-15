@@ -81,32 +81,33 @@ export function exportProjectToMermaid(project: FlowProject) {
   downloadFile(mmdStr, filename, "text/vnd.mermaid");
 }
 
+export function shouldExcludeFromExport(node: HTMLElement): boolean {
+  if (!node.classList) return false;
+  return (
+    node.classList.contains("flowcraft-exclude-export") ||
+    node.classList.contains("react-flow__panel") ||
+    node.classList.contains("react-flow__controls") ||
+    node.classList.contains("react-flow__minimap")
+  );
+}
+
 export async function exportCanvasToImage(
   element: HTMLElement,
   format: "png" | "svg",
-  title: string
+  title: string,
+  backgroundColor: string = "#0B0F19"
 ): Promise<void> {
   const filename = `${title.toLowerCase().replace(/[^a-z0-9_-]/g, "_") || "flowcraft_diagram"}.${format}`;
 
-  // Filter out editor overlays, selection controls, and minimap
+  // Filter out editor overlays, selection controls, and minimap using dedicated selector
   const filter = (node: HTMLElement) => {
-    if (node.classList) {
-      if (
-        node.classList.contains("react-flow__panel") ||
-        node.classList.contains("react-flow__controls") ||
-        node.classList.contains("react-flow__minimap") ||
-        node.classList.contains("nodrag-ui")
-      ) {
-        return false;
-      }
-    }
-    return true;
+    return !shouldExcludeFromExport(node);
   };
 
   if (format === "png") {
     const dataUrl = await toPng(element, {
       pixelRatio: 2, // High resolution
-      backgroundColor: "#0B0F19",
+      backgroundColor,
       filter: filter as (domNode: Node) => boolean,
     });
     const a = document.createElement("a");
@@ -117,7 +118,7 @@ export async function exportCanvasToImage(
     document.body.removeChild(a);
   } else {
     const dataUrl = await toSvg(element, {
-      backgroundColor: "#0B0F19",
+      backgroundColor,
       filter: filter as (domNode: Node) => boolean,
     });
     const a = document.createElement("a");

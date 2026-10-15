@@ -82,6 +82,7 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
   const [isDarkTheme, setIsDarkTheme] = useState(true);
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStage, setGenerationStage] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [validationWarnings, setValidationWarnings] = useState<ValidationIssue[]>([]);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
@@ -133,6 +134,8 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
       id: e.id,
       source: e.source,
       target: e.target,
+      sourceHandle: e.sourceHandle,
+      targetHandle: e.targetHandle,
       label: e.label,
       type: "custom",
       markerEnd: {
@@ -196,6 +199,8 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
         id: e.id,
         source: e.source,
         target: e.target,
+        sourceHandle: e.sourceHandle ?? undefined,
+        targetHandle: e.targetHandle ?? undefined,
         label: (e.label as string) || undefined,
       }));
 
@@ -233,6 +238,8 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
         id: `e_${params.source}_${params.target}_${Date.now()}`,
         source: params.source,
         target: params.target,
+        sourceHandle: params.sourceHandle ?? undefined,
+        targetHandle: params.targetHandle ?? undefined,
         type: "custom",
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -248,6 +255,36 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
       });
     },
     [nodes, setEdges, pushHistory]
+  );
+
+  // Synchronized keyboard & canvas deletion handlers
+  const onNodesDelete = useCallback(
+    (deletedNodes: Node[]) => {
+      const deletedIds = new Set(deletedNodes.map((n) => n.id));
+      const nextEdges = edges.filter(
+        (e) => !deletedIds.has(e.source) && !deletedIds.has(e.target)
+      );
+      const nextNodes = nodes.filter((n) => !deletedIds.has(n.id));
+      setEdges(nextEdges);
+      if (selectedNodeId && deletedIds.has(selectedNodeId)) {
+        setSelectedNodeId(null);
+      }
+      pushHistory(nextNodes, nextEdges);
+    },
+    [edges, nodes, selectedNodeId, setEdges, pushHistory]
+  );
+
+  const onEdgesDelete = useCallback(
+    (deletedEdges: Edge[]) => {
+      const deletedIds = new Set(deletedEdges.map((e) => e.id));
+      const nextEdges = edges.filter((e) => !deletedIds.has(e.id));
+      setEdges(nextEdges);
+      if (selectedEdgeId && deletedIds.has(selectedEdgeId)) {
+        setSelectedEdgeId(null);
+      }
+      pushHistory(nodes, nextEdges);
+    },
+    [edges, nodes, selectedEdgeId, setEdges, pushHistory]
   );
 
   // Undo / Redo Handlers
@@ -475,6 +512,7 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
     if (!prompt.trim() || isGenerating) return;
 
     setIsGenerating(true);
+    setGenerationStage("Connecting to AI model...");
     setGenerationError(null);
 
     try {
@@ -491,6 +529,7 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
         return;
       }
 
+      setGenerationStage("Computing diagram layout...");
       const generatedGraph = data.graph;
       const layoutResult = await calculateAutoLayout(
         generatedGraph.nodes,
@@ -498,6 +537,7 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
         activeProject?.layoutDirection || "TB"
       );
 
+      setGenerationStage("Rendering flowchart...");
       const rfNodes: Node[] = layoutResult.nodes.map((n: PositionedNode) => ({
         id: n.id,
         type: n.type,
@@ -554,6 +594,7 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
       setGenerationError("Network error while connecting to generation API.");
     } finally {
       setIsGenerating(false);
+      setGenerationStage(null);
     }
   };
 
@@ -620,13 +661,23 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
   // Export handlers
   const handleExportPng = () => {
     if (flowContainerRef.current && activeProject) {
-      exportCanvasToImage(flowContainerRef.current, "png", activeProject.title);
+      exportCanvasToImage(
+        flowContainerRef.current,
+        "png",
+        activeProject.title,
+        isDarkTheme ? "#0B0F19" : "#F8FAFC"
+      );
     }
   };
 
   const handleExportSvg = () => {
     if (flowContainerRef.current && activeProject) {
-      exportCanvasToImage(flowContainerRef.current, "svg", activeProject.title);
+      exportCanvasToImage(
+        flowContainerRef.current,
+        "svg",
+        activeProject.title,
+        isDarkTheme ? "#0B0F19" : "#F8FAFC"
+      );
     }
   };
 
@@ -707,6 +758,7 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
           onPromptChange={setPrompt}
           onGenerate={handleGenerate}
           isGenerating={isGenerating}
+          generationStage={generationStage}
           generationError={generationError}
           layoutDirection={activeProject?.layoutDirection || "TB"}
           onLayoutDirectionChange={(dir) => {
@@ -728,7 +780,12 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
         />
 
         {/* Center Canvas */}
-        <div ref={flowContainerRef} className="flex-1 h-full relative overflow-hidden bg-[#0B0F19]">
+        <div
+          ref={flowContainerRef}
+          className={`flex-1 h-full relative overflow-hidden transition-colors duration-200 ${
+            isDarkTheme ? "bg-[#0B0F19]" : "bg-slate-100"
+          }`}
+        >
           <Toolbar onAddNode={handleAddNode} />
 
           <ReactFlow
@@ -736,6 +793,8 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onNodesDelete={onNodesDelete}
+            onEdgesDelete={onEdgesDelete}
             onConnect={onConnect}
             onInit={setRfInstance}
             onSelectionChange={onSelectionChange}
@@ -751,7 +810,7 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
               variant={BackgroundVariant.Dots}
               gap={20}
               size={1.5}
-              color="#1E293B"
+              color={isDarkTheme ? "#1E293B" : "#CBD5E1"}
             />
             <Controls className="bg-slate-900 border border-slate-700/80 rounded-xl fill-slate-300 p-1 shadow-xl" />
             <MiniMap
@@ -775,8 +834,10 @@ export const FlowcraftEditor: React.FC<FlowcraftEditorProps> = ({
                     return "#3B82F6";
                 }
               }}
-              maskColor="rgba(11, 15, 25, 0.75)"
-              className="bg-slate-950 border border-slate-800 rounded-xl shadow-xl overflow-hidden"
+              maskColor={isDarkTheme ? "rgba(11, 15, 25, 0.75)" : "rgba(241, 245, 249, 0.75)"}
+              className={`border rounded-xl shadow-xl overflow-hidden ${
+                isDarkTheme ? "bg-slate-950 border-slate-800" : "bg-white border-slate-300"
+              }`}
             />
           </ReactFlow>
 

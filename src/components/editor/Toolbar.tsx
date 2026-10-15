@@ -29,7 +29,7 @@ const TOOLBAR_ITEMS: { type: NodeType; label: string; icon: React.ReactNode; col
 
 export const Toolbar: React.FC<ToolbarProps> = ({ onAddNode }) => {
   return (
-    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1.5 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-xl">
+    <div className="flowcraft-exclude-export absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 p-1.5 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-xl">
       <span className="text-[11px] font-semibold text-slate-400 px-2 flex items-center gap-1">
         <Plus className="w-3.5 h-3.5" />
         Add:

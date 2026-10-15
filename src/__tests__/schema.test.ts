@@ -68,4 +68,24 @@ describe("Schema Validation Tests", () => {
     const res = FlowProjectSchema.safeParse(project);
     expect(res.success).toBe(true);
   });
+
+  it("validates and preserves sourceHandle and targetHandle in FlowEdgeSchema", async () => {
+    const { FlowEdgeSchema } = await import("../lib/schema");
+
+    const edgeWithHandles = {
+      id: "e_custom_1",
+      source: "node_1",
+      target: "node_2",
+      sourceHandle: "right",
+      targetHandle: "left-target",
+      label: "Yes",
+    };
+
+    const res = FlowEdgeSchema.safeParse(edgeWithHandles);
+    expect(res.success).toBe(true);
+    if (res.success) {
+      expect(res.data.sourceHandle).toBe("right");
+      expect(res.data.targetHandle).toBe("left-target");
+    }
+  });
 });

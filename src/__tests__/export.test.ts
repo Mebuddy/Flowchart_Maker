@@ -75,4 +75,24 @@ describe("Export and Import Utilities Tests", () => {
     expect(res2.success).toBe(false);
     expect(res2.error).toContain("Invalid project file format");
   });
+
+  it("filters editor controls while preserving decision branch labels in exports", async () => {
+    const { shouldExcludeFromExport } = await import("../lib/export");
+
+    // Mock DOM elements
+    const toolbarEl = { classList: { contains: (c: string) => c === "flowcraft-exclude-export" } } as unknown as HTMLElement;
+    const controlsEl = { classList: { contains: (c: string) => c === "react-flow__controls" } } as unknown as HTMLElement;
+    const minimapEl = { classList: { contains: (c: string) => c === "react-flow__minimap" } } as unknown as HTMLElement;
+    const edgeLabelEl = { classList: { contains: (c: string) => c === "nodrag-ui" } } as unknown as HTMLElement;
+    const nodeEl = { classList: { contains: (c: string) => c === "custom-flow-node" } } as unknown as HTMLElement;
+
+    // Controls must be excluded
+    expect(shouldExcludeFromExport(toolbarEl)).toBe(true);
+    expect(shouldExcludeFromExport(controlsEl)).toBe(true);
+    expect(shouldExcludeFromExport(minimapEl)).toBe(true);
+
+    // Edge labels and nodes must NOT be excluded
+    expect(shouldExcludeFromExport(edgeLabelEl)).toBe(false);
+    expect(shouldExcludeFromExport(nodeEl)).toBe(false);
+  });
 });

@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateRequestSession } from "@/lib/auth";
-import { generateFlowGraph } from "@/lib/gemini";
+import { generateFlowGraph, GeminiOverloadError } from "@/lib/gemini";
 
 export const maxDuration = 60; // Allow sufficient time for LLM generation
 
+// Active generation requests tracker to prevent concurrent duplicate generation
+const activePrompts = new Set<string>();
+
 export async function POST(req: NextRequest) {
+  let promptKey = "";
+
   try {
     // 1. Session verification
     const isAuthenticated = await validateRequestSession();
@@ -41,8 +46,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. AI Generation
-    const { graph, validation } = await generateFlowGraph(trimmedPrompt);
+    // 3. Concurrency check: prevent identical concurrent in-flight requests
+    promptKey = trimmedPrompt.substring(0, 100);
+    if (activePrompts.has(promptKey)) {
+      return NextResponse.json(
+        {
+          error: "A flowchart generation for this prompt is already in progress. Please wait for it to finish.",
+          isConcurrentDuplicate: true,
+        },
+        { status: 429 }
+      );
+    }
+    activePrompts.add(promptKey);
+
+    // 4. AI Generation with bounded retry, backoff, and fallback
+    const { graph, validation, usedFallbackModel, metrics } = await generateFlowGraph(trimmedPrompt);
+
+    if (process.env.NODE_ENV !== "production") {
+      console.log(
+        `[Flowcraft API] Generated in ${metrics?.totalDurationMs ?? "?"}ms | Retries: ${metrics?.retryCount ?? 0} | Fallback: ${Boolean(usedFallbackModel)} | Nodes: ${graph.nodes.length} | Edges: ${graph.edges.length}`
+      );
+    }
 
     if (!validation.isValid) {
       return NextResponse.json(
@@ -50,6 +74,7 @@ export async function POST(req: NextRequest) {
           error: "The generated flowchart had critical structural errors that could not be automatically resolved.",
           validation,
           graph,
+          metrics,
         },
         { status: 422 }
       );
@@ -59,12 +84,30 @@ export async function POST(req: NextRequest) {
       success: true,
       graph,
       validation,
+      usedFallbackModel: Boolean(usedFallbackModel),
+      metrics,
     });
   } catch (err: unknown) {
+    if (err instanceof GeminiOverloadError) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          isOverload: true,
+          retryable: true,
+          retryAfter: err.retryAfterSeconds,
+        },
+        { status: 503 }
+      );
+    }
+
     const message = err instanceof Error ? err.message : "An unexpected server error occurred.";
     return NextResponse.json(
-      { error: message },
+      { error: message, isOverload: false, retryable: false },
       { status: 500 }
     );
+  } finally {
+    if (promptKey) {
+      activePrompts.delete(promptKey);
+    }
   }
 }

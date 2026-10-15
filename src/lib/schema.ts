@@ -28,6 +28,8 @@ export const FlowEdgeSchema = z.object({
   id: z.string().min(1, "Edge ID cannot be empty"),
   source: z.string().min(1, "Source node ID cannot be empty"),
   target: z.string().min(1, "Target node ID cannot be empty"),
+  sourceHandle: z.string().optional(),
+  targetHandle: z.string().optional(),
   label: z.string().optional(),
 });
 

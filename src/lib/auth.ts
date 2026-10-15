@@ -5,7 +5,11 @@ import crypto from "crypto";
 export const SESSION_COOKIE_NAME = "flowcraft_session";
 const SESSION_EXPIRATION_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
-// In-memory rate limiting map for login attempts (IP / identifier -> attempts + timestamp)
+// ARCHITECTURAL NOTE: This in-memory rate limiting map provides instance-level brute-force mitigation
+// designed for single-owner personal deployments. In a multi-instance or serverless environment
+// (such as Vercel), serverless functions are ephemeral and isolated. If this application is ever
+// converted into a public multi-user SaaS, a distributed shared store (e.g. Upstash Redis / Vercel KV)
+// must be integrated to coordinate attempt counters across all serverless instances.
 interface RateLimitRecord {
   count: number;
   resetAt: number;
@@ -104,6 +108,11 @@ export async function verifySessionToken(token: string): Promise<boolean> {
 export async function validateRequestSession(): Promise<boolean> {
   if (!isAuthRequired()) {
     return true;
+  }
+
+  // Fail closed if production environment lacks complete auth configuration
+  if (process.env.NODE_ENV === "production" && !isAuthConfigured()) {
+    return false;
   }
 
   const cookieStore = await cookies();

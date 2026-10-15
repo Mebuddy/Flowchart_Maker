@@ -21,6 +21,7 @@ interface LeftSidebarProps {
   onGenerate: () => void;
   isGenerating: boolean;
   generationError: string | null;
+  generationStage?: string | null;
   layoutDirection: LayoutDirection;
   onLayoutDirectionChange: (dir: LayoutDirection) => void;
   savedProjects: FlowProject[];
@@ -57,6 +58,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onGenerate,
   isGenerating,
   generationError,
+  generationStage,
   layoutDirection,
   onLayoutDirectionChange,
   savedProjects,
@@ -178,32 +180,58 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
             </div>
           </div>
 
-          {/* Error message */}
+          {/* Error message with manual retry */}
           {generationError && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-              <div className="leading-relaxed break-words">{generationError}</div>
+            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex flex-col gap-2.5 animate-in fade-in">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                <div className="leading-relaxed break-words flex-1">{generationError}</div>
+              </div>
+              <div className="flex items-center justify-between pt-1 border-t border-rose-500/20">
+                <span className="text-[10px] text-rose-400/80">
+                  {generationError.toLowerCase().includes("demand") || generationError.toLowerCase().includes("overload")
+                    ? "Transient condition"
+                    : "Action required"}
+                </span>
+                <button
+                  type="button"
+                  onClick={onGenerate}
+                  disabled={isGenerating}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 border border-rose-500/40 rounded-md font-semibold text-[11px] transition-colors"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isGenerating ? "animate-spin" : ""}`} />
+                  <span>Retry Now</span>
+                </button>
+              </div>
             </div>
           )}
 
-          {/* Generate Button */}
-          <button
-            onClick={onGenerate}
-            disabled={isGenerating || prompt.trim() === "" || isOverLimit}
-            className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
-          >
-            {isGenerating ? (
-              <>
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Generating Flowchart...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 text-blue-200" />
-                <span>Generate Flowchart</span>
-              </>
+          {/* Generate Button with honest stage indicator */}
+          <div className="space-y-2">
+            <button
+              onClick={onGenerate}
+              disabled={isGenerating || prompt.trim() === "" || isOverLimit}
+              className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>{generationStage || "Generating Flowchart..."}</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-blue-200" />
+                  <span>Generate Flowchart</span>
+                </>
+              )}
+            </button>
+            {isGenerating && (
+              <div className="p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] flex items-center gap-2 animate-in fade-in">
+                <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0" />
+                <span className="truncate">{generationStage || "Processing request..."}</span>
+              </div>
             )}
-          </button>
+          </div>
 
           {/* Quick Example Templates */}
           <div className="pt-2">
